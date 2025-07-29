@@ -1,3 +1,7 @@
+# This code in part draws from: https://github.com/snap-research/graphless-neural-networks
+# Please see the license here: https://github.com/snap-research/graphless-neural-networks/blob/main/LICENSE
+# No changes were made to the original code.
+
 import numpy as np
 import copy
 import torch
