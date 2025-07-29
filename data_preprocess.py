@@ -1,3 +1,7 @@
+# This code in part draws from: https://github.com/snap-research/graphless-neural-networks
+# Please see the license here: https://github.com/snap-research/graphless-neural-networks/blob/main/LICENSE
+# Changes were made to the original code.
+
 """
 Adapted from the CPF implementation
 https://github.com/BUPT-GAMMA/CPF/tree/389c01aaf238689ee7b1e5aba127842341e123b6/data
