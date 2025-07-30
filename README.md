@@ -12,8 +12,9 @@ This repository contains the code and data for the paper.
 
 The following files were heavily derived from [Shichang Zhang's GLNN repo](https://github.com/snap-research/graphless-neural-networks): `data_preprocess.py`, `dataloader.py`, `models.py`, `train.conf.yaml`, `train_and_eval.py`, `train_student.py`, `train_teacher.py`, `utils.py`
 
-## Folders
-- `data`: contains the data that is loaded by the dataloader
-- `saved_arrays`: contains npy files saved during training for easy access during analysis
+## Running experiments
+First, you will need to create the following folders: 
+- `data`: will contain the data that is loaded by the dataloader
+- `saved_arrays`: will contain npy files saved during training for easy access during analysis
 
 To run experiments, run the `run_all.py` or `run_all_existing.py` scripts. 
