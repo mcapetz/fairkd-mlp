@@ -9,3 +9,5 @@ This repository contains the code and data for the paper.
 - `plot.py`, `plot_existing.py`: plotting code for custom synthetic SBM datasets and existing (real-world and synthetic) fairness datasets
 - `run_all.py`, `run_all_existing.py`: main runner scripts that run experiments for both custom and existing datasets
 - `train.conf.yaml`, `train_and_eval.py`, `train_student.py`, `train_teacher.py`, `utils.py`: scripts related to training teacher and student
+
+The following files were heavily derived from [Shichang Zhang's GLNN repo](https://github.com/snap-research/graphless-neural-networks): `data_preprocess.py`, `dataloader.py`, `models.py`, `train.conf.yaml`, `train_and_eval.py`, `train_student.py`, `train_teacher.py`, `utils.py`
