@@ -333,6 +333,180 @@ fig_combined_auc = create_combined_heatmap_grid(auc_dict_pxc, auc_dict_qxc, auc_
                                            save_path=f'{figs_folder}/combined_heatmap_auc.png')
 
 
+def create_combined_heatmap_grid_with_error(auc_dict_pxc, auc_dict_qxc, auc_dict_qxp, 
+                               metric_type='acc', save_path=None):
+    """
+    Create a single 3x3 grid showing all parameter combinations.
+    
+    Parameters:
+    - auc_dict_pxc: Dictionary for p vs c (q fixed at 0.5 the median)
+    - auc_dict_qxc: Dictionary for q vs c (p fixed at 0.3 the median)  
+    - auc_dict_qxp: Dictionary for q vs p (c fixed at 0.3 the median)
+    - metric_type: 'acc' or 'auc'
+    - save_path: Path to save the figure
+    """
+
+    # Define parameter values
+    p_values = [0.1, 0.2, 0.3, 0.4, 0.5]
+    q_values = [0.05, 0.25, 0.50, 0.75, 1.00]
+    c_values = [0.1, 0.2, 0.3, 0.4, 0.5]
+
+    # Increase figure size and spacing
+    fig = plt.figure(figsize=(18, 14), constrained_layout=False)
+    gs = gridspec.GridSpec(3, 3, figure=fig, wspace=0.35, hspace=0.45)
+
+    # Define row configurations: (dict_name, x_values, y_values, x_label, y_label, title_suffix)
+    row_configs = [
+        (auc_dict_pxc, p_values, c_values, 'Group Balance (p)', 'Class Balance (c)', '(q=0.5)'),
+        (auc_dict_qxc, q_values, c_values, 'Edge Ratio (q)', 'Class Balance (c)', '(p=0.3)'),
+        (auc_dict_qxp, q_values, p_values, 'Edge Ratio (q)', 'Group Balance (p)', '(c=0.3)')
+    ]
+    
+    col_metrics = ['teacher', 'student', 'diff']
+    col_titles = ['Teacher Fairness', 'Student Fairness', 'Teacher - Student Fairness']
+
+    # Precompute common vmin/vmax for all teacher and student metrics
+    teacher_vals = []
+    student_vals = []
+    teacher_student_vals = []
+
+    # Collect all values for consistent scaling
+    for data_dict, x_vals, y_vals, _, _, _ in row_configs:
+        for x_val in x_vals:
+            for y_val in y_vals:
+                try:
+                    teacher_vals.append(data_dict[x_val][y_val][f"avg_teacher_{metric_type}_diffs"])
+                    student_vals.append(data_dict[x_val][y_val][f"avg_student_{metric_type}_diffs"])
+                    diff = data_dict[x_val][y_val][f"avg_teacher_{metric_type}_diffs"] - data_dict[x_val][y_val][f"avg_student_{metric_type}_diffs"]
+                    teacher_student_vals.append(diff)
+                except KeyError:
+                    continue
+
+    shared_vmin = min(teacher_vals + student_vals) if teacher_vals and student_vals else 0
+    shared_vmax = max(teacher_vals + student_vals) if teacher_vals and student_vals else 1
+
+    teacher_student_vmin = min(teacher_student_vals) if teacher_student_vals else -0.1
+    teacher_student_vmax = max(teacher_student_vals) if teacher_student_vals else 0.1
+
+    # Create the 3x3 grid of heatmaps
+    for row_idx, (data_dict, x_values, y_values, x_label, y_label, title_suffix) in enumerate(row_configs):
+        for col_idx, metric in enumerate(col_metrics):
+            ax = fig.add_subplot(gs[row_idx, col_idx])
+
+            # Create data matrix
+            data_matrix = np.full((len(y_values), len(x_values)), np.nan)
+            
+            # Create error matrix
+            error_matrix = np.full((len(y_values), len(x_values)), np.nan)
+            
+            for i, y_val in enumerate(y_values):
+                for j, x_val in enumerate(x_values):
+                    try:
+                        if metric == 'teacher':
+                            data_matrix[i, j] = data_dict[x_val][y_val][f"avg_teacher_{metric_type}_diffs"]
+                            error_matrix[i, j] = data_dict[x_val][y_val][f"std_teacher_{metric_type}_diffs"]
+                        elif metric == 'student':
+                            data_matrix[i, j] = data_dict[x_val][y_val][f"avg_student_{metric_type}_diffs"]
+                            error_matrix[i, j] = data_dict[x_val][y_val][f"std_student_{metric_type}_diffs"]
+                        else:  # diff
+                            teacher_val = data_dict[x_val][y_val][f"avg_teacher_{metric_type}_diffs"]
+                            student_val = data_dict[x_val][y_val][f"avg_student_{metric_type}_diffs"]
+                            data_matrix[i, j] = teacher_val - student_val
+                            error_matrix[i, j] = data_dict[x_val][y_val][f"std_teacher_{metric_type}_diffs"] - data_dict[x_val][y_val][f"std_student_{metric_type}_diffs"]
+                    except KeyError as e:
+                        print(f"KeyError at row {row_idx}, col {col_idx}: {e}")
+
+            # Set vmin and vmax based on metric
+            if metric in ['teacher', 'student']:
+                vmin = shared_vmin
+                vmax = shared_vmax
+                cmap = 'viridis'
+                norm = None
+                viridis_ticks = np.round(np.linspace(vmin, vmax, 7), 3)
+                cbar_kws = {'label': 'Difference', 'ticks': viridis_ticks}
+            else:  # diff heatmap
+                abs_max = max(abs(teacher_student_vmin), abs(teacher_student_vmax))
+                vmin = -abs_max
+                vmax = abs_max
+                cmap = 'RdBu'
+                norm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+                ticks = np.linspace(vmin, vmax, 7)
+                cbar_kws = {'label': 'Difference', 'ticks': ticks}
+                
+            # Reverse y-axis to make it ascending from bottom to top
+            reversed_data_matrix = np.flipud(data_matrix)
+            reversed_error_matrix = np.flipud(error_matrix)
+            reversed_y_labels = [f"{y:.2f}" if y < 1 else f"{y:.1f}" for y in reversed(y_values)]
+
+            # Custom annotations w/ error
+            annotations = []
+            for i in range(len(y_values)):
+                row_annotations = []
+                for j in range(len(x_values)):
+                    mean_val = reversed_data_matrix[i, j]
+                    error_val = reversed_error_matrix[i, j]
+                    
+                    annotation = f"{mean_val:.3f}\n±{error_val:.3f}"
+                    
+                    row_annotations.append(annotation)
+                annotations.append(row_annotations)
+                
+            # Heatmap
+            sns.heatmap(
+                reversed_data_matrix, annot=annotations, cmap=cmap, norm=norm, ax=ax, fmt='',
+                xticklabels=[f"{x:.2f}" if x < 1 else f"{x:.1f}" for x in x_values], 
+                yticklabels=reversed_y_labels,
+                cbar_kws=cbar_kws,
+                vmin=vmin, vmax=vmax,
+                annot_kws={'fontsize': 8}
+            )
+            
+            ax.set_title(f"{col_titles[col_idx]}", fontsize=13, pad=20)
+            
+            # Add dispersion annotation (standard deviation of the matrix)
+            dispersion = np.nanstd(data_matrix)
+            ax.text(1.02, 1.05, f"stdev: {dispersion:.3f}", 
+                horizontalalignment='left',
+                verticalalignment='bottom', 
+                transform=ax.transAxes,
+                fontsize=10,
+                bbox=dict(facecolor='lightblue', alpha=0.7, edgecolor='lightgray', boxstyle='round,pad=0.3'))
+
+            # Set labels and title
+            ax.set_xlabel(x_label, fontsize=10)
+            ax.set_ylabel(y_label, fontsize=10)
+
+            # Set title - add suffix only for first column to avoid repetition
+            if col_idx == 0:
+                full_title = f"{col_titles[col_idx]} {title_suffix}"
+            else:
+                full_title = col_titles[col_idx]
+            ax.set_title(full_title, fontsize=11, pad=20)
+
+    # Set main title
+    metric_name = 'Accuracy' if metric_type == 'acc' else 'AUC'
+    plt.suptitle(f'{metric_name} Fairness Differences (0-1)', fontsize=16, y=0.96)
+
+    # Use tight_layout with padding
+    plt.tight_layout(rect=[0, 0.03, 1, 0.96])
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
+    return fig
+
+
+fig_combined_acc_error = create_combined_heatmap_grid_with_error(auc_dict_pxc, auc_dict_qxc, auc_dict_qxp, 
+                                           metric_type='acc', 
+                                           save_path=f'{figs_folder}/combined_heatmap_error_acc.png')
+
+fig_combined_auc_error = create_combined_heatmap_grid_with_error(auc_dict_pxc, auc_dict_qxc, auc_dict_qxp, 
+                                           metric_type='auc', 
+                                           save_path=f'{figs_folder}/combined_heatmap_error_auc.png')
+
 # -
 
 def plot_fairness_subplots_updated(auc_dict_pxc, auc_dict_qxc, auc_dict_qxp, 
