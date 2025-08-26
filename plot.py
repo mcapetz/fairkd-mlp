@@ -446,7 +446,7 @@ def create_combined_heatmap_grid_with_error(auc_dict_pxc, auc_dict_qxc, auc_dict
                     mean_val = reversed_data_matrix[i, j]
                     error_val = reversed_error_matrix[i, j]
                     
-                    annotation = f"{mean_val:.3f}\n±{error_val:.3f}"
+                    annotation = f"{mean_val:.3f}\n±{abs(error_val):.3f}"
                     
                     row_annotations.append(annotation)
                 annotations.append(row_annotations)
@@ -485,7 +485,8 @@ def create_combined_heatmap_grid_with_error(auc_dict_pxc, auc_dict_qxc, auc_dict
 
     # Set main title
     metric_name = 'Accuracy' if metric_type == 'acc' else 'AUC'
-    plt.suptitle(f'{metric_name} Fairness Differences (0-1)', fontsize=16, y=0.96)
+    plt.suptitle(f'{metric_name} Fairness Differences (0-1) with Error Bars', fontsize=16, y=0.96)
+
 
     # Use tight_layout with padding
     plt.tight_layout(rect=[0, 0.03, 1, 0.96])
